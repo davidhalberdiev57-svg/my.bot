@@ -1,7 +1,24 @@
 import os
+import threading
 import telebot
+from flask import Flask
 from yt_dlp import YoutubeDL
 
+# 1. Веб-сервер для обмана Render
+app = Flask(__name__)
+
+
+@app.route("/")
+def home():
+    return "Bot is alive!"
+
+
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
+
+# 2. Telegram Бот
 TOKEN = "8863043974:AAGzQ2NmtxHa1MjS2AmTCYX1epmmrq4Bpv0"
 bot = telebot.TeleBot(TOKEN)
 
@@ -57,4 +74,7 @@ def download_media(message):
 
 
 if __name__ == "__main__":
+    # Запускаем веб-сервер в отдельном потоке
+    threading.Thread(target=run_flask).start()
+    # Запускаем бота
     bot.polling(non_stop=True)
