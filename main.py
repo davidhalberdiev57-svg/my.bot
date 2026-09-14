@@ -1,55 +1,58 @@
+import datetime
 import os
 import threading
-import datetime
-import telebot
 from flask import Flask
+import telebot
 from telebot import types
 from yt_dlp import YoutubeDL
 
 # 1. Веб-сервер 24/7 для Render
 app = Flask(__name__)
 
-@app.route('/')
+
+@app.route("/")
 def home():
     return "Bot is active 24/7!"
+
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-# 2. Инициализация бота
-TOKEN = "8863043974:AAGzQ2NmtxHa1MjS2AmTCYX1epmmrq4Bpv0"
+
+# 2. Инициализация бота с новым токеном
+TOKEN = "8863043974:AAFhOR9dwlFrzw_zcvSRnMyk8CM7xDs02aM"
 bot = telebot.TeleBot(TOKEN)
 
-# Хранилище
+# Данные администраторов и безопасности
 ADMIN_PASSWORD = "571634sav"
 admins = set()
 
-# Данные пользователей
+# Данные пользователей и базы в памяти
 all_users = set()
-vip_until = {}       # user_id: datetime окончания VIP
-referrals = {}       # user_id: set(приглашенных_user_id)
-user_states = {}     # user_id: текущее состояние
+vip_until = {}  # user_id: datetime окончания VIP
+referrals = {}  # user_id: set(приглашенных_user_id)
+user_states = {}  # user_id: текущее состояние ввода
 
-# Базовые промокоды
-promocodes = {
-    "abdufattoh": "Мамин вечный VIP (Без рекламы)"
-}
+# Базовые промокоды (Код: описание)
+promocodes = {"abdufattoh": "Мамин вечный VIP (Без рекламы)"}
+
 
 def is_vip(user_id):
     if user_id not in vip_until:
         return False
     return vip_until[user_id] > datetime.datetime.now()
 
+
 def add_vip_days(user_id, days):
     now = datetime.datetime.now()
     if is_vip(user_id):
         vip_until[user_id] += datetime.timedelta(days=days)
     else:
-        # Для маминого кода (9999 дней = вечность)
         vip_until[user_id] = now + datetime.timedelta(days=days)
 
-# Главная клавиатура
+
+# Главная клавиатура с кнопками
 def main_keyboard(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn1 = types.KeyboardButton("📥 Как скачивать")
@@ -64,25 +67,30 @@ def main_keyboard(user_id):
 
     return markup
 
-# Команда /start (поддержка рефералок)
-@bot.message_handler(commands=['start'])
+
+# Команда /start с поддержкой реферальных ссылок
+@bot.message_handler(commands=["start"])
 def send_welcome(message):
     user_id = message.chat.id
     args = message.text.split()
 
-    # Проверка реферала
+    # Проверка реферального перехода
     if len(args) > 1 and args[1].isdigit():
         referrer_id = int(args[1])
         if user_id not in all_users and referrer_id != user_id:
             if referrer_id not in referrals:
                 referrals[referrer_id] = set()
             referrals[referrer_id].add(user_id)
-            
-            # Начисляем 3 дня VIP пригласившему
+
+            # Выдача +3 дня VIP пригласившему
             add_vip_days(referrer_id, 3)
             try:
-                bot.send_message(referrer_id, "🎉 По вашей ссылке зарегистрировался новый пользователь!\n🎁 Вам зачислено **+3 дня VIP**!", parse_mode="Markdown")
-            except:
+                bot.send_message(
+                    referrer_id,
+                    "🎉 По вашей ссылке зарегистрировался новый пользователь!\n🎁 Вам зачислено **+3 дня VIP**!",
+                    parse_mode="Markdown",
+                )
+            except Exception:
                 pass
 
     all_users.add(user_id)
@@ -90,13 +98,19 @@ def send_welcome(message):
 
     welcome_text = (
         f"👋 Привет, **{message.from_user.first_name}**!\n\n"
-        f"Я скачиваю видео и фото из **Instagram**, **TikTok** и **Pinterest**.\n\n"
-        f"🔗 **Просто отправь ссылку на медиа!**"
+        f"Я скачиваю медиа из **Instagram**, **TikTok** и **Pinterest**.\n\n"
+        f"🔗 **Просто отправь мне ссылку на фото или видео!**"
     )
-    bot.send_message(user_id, welcome_text, parse_mode="Markdown", reply_markup=main_keyboard(user_id))
+    bot.send_message(
+        user_id,
+        welcome_text,
+        parse_mode="Markdown",
+        reply_markup=main_keyboard(user_id),
+    )
 
-# Вход в админку с паролем
-@bot.message_handler(commands=['admin'])
+
+# Вход в админку по паролю (/admin 571634sav)
+@bot.message_handler(commands=["admin"])
 def admin_login(message):
     args = message.text.split(maxsplit=1)
     if len(args) < 2 or args[1] != ADMIN_PASSWORD:
@@ -105,14 +119,51 @@ def admin_login(message):
 
     admins.add(message.chat.id)
     bot.reply_to(
-        message, 
-        "⚙️ **Успешный вход в Админ-панель!**", 
-        parse_mode="Markdown", 
-        reply_markup=main_keyboard(message.chat.id)
+        message,
+        "⚙️ **Успешный вход в Админ-панель!**",
+        parse_mode="Markdown",
+        reply_markup=main_keyboard(message.chat.id),
     )
 
-# Обработка текстового меню
-@bot.message_handler(func=lambda m: m.text in ["📥 Как скачивать", "👑 VIP и Промокоды", "👥 Рефералы", "🎟 Ввести промокод", "⚙️ Админ-панель"])
+
+# Добавление промокода админом: /addpromo КОД ДНИ Описание
+@bot.message_handler(commands=["addpromo"])
+def add_promo(message):
+    if message.chat.id not in admins:
+        return
+
+    args = message.text.split(maxsplit=3)
+    if len(args) < 4 or not args[2].isdigit():
+        bot.reply_to(
+            message,
+            "⚠️ **Неверный формат!**\n\nИспользуй: `/addpromo КОД ДНИ Описание`\nПример: `/addpromo dep 90 Промокод для депа`",
+            parse_mode="Markdown",
+        )
+        return
+
+    code = args[1].strip()
+    days = int(args[2])
+    desc = args[3].strip()
+
+    promocodes[code] = f"+{days} дней VIP ({desc})"
+    bot.reply_to(
+        message,
+        f"✅ Промокод `{code}` на **{days} дней** успешно создан!",
+        parse_mode="Markdown",
+    )
+
+
+# Обработка меню
+@bot.message_handler(
+    func=lambda m: m.text
+    in [
+        "📥 Как скачивать",
+        "👑 VIP и Промокоды",
+        "👥 Рефералы",
+        "🎟 Ввести промокод",
+        "⚙️ Админ-панель",
+    ]
+)
 def handle_menu(message):
     user_id = message.chat.id
     user_states.pop(user_id, None)
@@ -121,8 +172,8 @@ def handle_menu(message):
         text = (
             "📌 **Инструкция:**\n\n"
             "1. Скопируй ссылку из **Instagram**, **TikTok** или **Pinterest**.\n"
-            "2. Отправь ссылку в этот чат.\n"
-            "3. Получи чистый файл в оригинальном качестве!"
+            "2. Отправь её в этот чат.\n"
+            "3. Получи файл в оригинальном качестве!"
         )
         bot.send_message(user_id, text, parse_mode="Markdown")
 
@@ -136,13 +187,13 @@ def handle_menu(message):
 
         text = (
             f"👑 **Ваш VIP-Статус:** {status}\n\n"
-            "**Преимущества VIP:**\n"
+            "**Возможности VIP:**\n"
             "• Без рекламы ✨\n"
             "• Максимальная скорость скачивания 🚀\n"
-            "• Загрузка без ограничений ⚡️\n\n"
+            "• Безлимитная загрузка ⚡️\n\n"
             "🎁 **Как получить VIP бесплатно?**\n"
-            "• Приглашай друзей по реферальной ссылке (+3 дня за друга)!\n"
-            "• Активируй промокод через кнопку ниже."
+            "• Приглашай друзей по своей ссылке (+3 дня за человека)\n"
+            "• Активируй промокод кнопкой «🎟 Ввести промокод»"
         )
         bot.send_message(user_id, text, parse_mode="Markdown")
 
@@ -153,24 +204,29 @@ def handle_menu(message):
 
         text = (
             "👥 **Реферальная программа**\n\n"
-            f"Приглашено друзей: **{ref_count}**\n"
-            "Бонус: **+3 дня VIP** за каждого друга! 🎁\n\n"
-            "🔗 **Ваша ссылка для приглашения:**\n"
-            f"`{ref_link}`\n\n"
-            "Отправьте эту ссылку друзьям!"
+            f"Приглашено пользователей: **{ref_count}**\n"
+            "Награда: **+3 дня VIP** за каждого друга! 🎁\n\n"
+            "🔗 **Ваша уникальная ссылка:**\n"
+            f"`{ref_link}`"
         )
         bot.send_message(user_id, text, parse_mode="Markdown")
 
     elif message.text == "🎟 Ввести промокод":
         user_states[user_id] = "WAITING_PROMO"
-        bot.send_message(user_id, "✏️ **Отправь промокод ответным сообщением:**", parse_mode="Markdown")
+        bot.send_message(
+            user_id,
+            "✏️ **Отправь промокод ответным сообщением:**",
+            parse_mode="Markdown",
+        )
 
     elif message.text == "⚙️ Админ-панель":
         if user_id not in admins:
             bot.send_message(user_id, "⛔️ Доступ запрещен.")
             return
 
-        promo_list = "\n".join([f"• `{code}` — {desc}" for code, desc in promocodes.items()])
+        promo_list = "\n".join(
+            [f"• `{code}` — {desc}" for code, desc in promocodes.items()]
+        )
         text = (
             "⚙️ **АДМИН-ПАНЕЛЬ**\n\n"
             f"👥 Всего пользователей: **{len(all_users)}**\n"
@@ -178,62 +234,57 @@ def handle_menu(message):
             f"🎟 **Действующие промокоды:**\n{promo_list}\n\n"
             "➕ **Создать промокод:**\n"
             "Напиши: `/addpromo КОД ДНИ Описание`\n"
-            "_(Пример: `/addpromo VIP30 30 Промокод на месяц`)_"
+            "_(Пример: `/addpromo dep 90 Промокод для депа`)_"
         )
         bot.send_message(user_id, text, parse_mode="Markdown")
 
-# Добавление промокода Админом
-@bot.message_handler(commands=['addpromo'])
-def add_promo(message):
-    if message.chat.id not in admins:
-        return
 
-    args = message.text.split(maxsplit=3)
-    if len(args) < 4 or not args[2].isdigit():
-        bot.reply_to(message, "⚠️ Формат: `/addpromo КОД ДНИ Описание`\nПример: `/addpromo TEST 7 Тестовый код`", parse_mode="Markdown")
-        return
-
-    code = args[1].strip()
-    days = int(args[2])
-    desc = args[3].strip()
-
-    promocodes[code] = f"+{days} дней VIP ({desc})"
-    bot.reply_to(message, f"✅ Промокод `{code}` на {days} дней создан!", parse_mode="Markdown")
-
-# Скачивание медиа и ввод промокодов
+# Скачивание медиа и обработка введенного промокода
 @bot.message_handler(func=lambda message: True)
 def handle_all_messages(message):
     user_id = message.chat.id
     text = message.text.strip()
 
-    # Если пользователь вводит промокод по кнопке
+    # Ввод промокода через кнопку
     if user_states.get(user_id) == "WAITING_PROMO":
         user_states.pop(user_id, None)
-        
+
         if text in promocodes or text == "abdufattoh":
             if text == "abdufattoh":
-                add_vip_days(user_id, 99999) # Мамин код
+                add_vip_days(user_id, 36500)  # Вечный VIP для мамы
             else:
-                # Извлекаем дни или даем 30 дней по умолчанию
                 add_vip_days(user_id, 30)
 
-            bot.reply_to(message, f"🎉 **Промокод `{text}` активирован!**\n👑 Вам включен VIP-доступ!", parse_mode="Markdown")
+            bot.reply_to(
+                message,
+                f"🎉 **Промокод `{text}` активирован!**\n👑 Вам зачислен VIP-доступ!",
+                parse_mode="Markdown",
+            )
         else:
             bot.reply_to(message, "❌ Неверный промокод.", parse_mode="Markdown")
         return
 
-    # Проверка ссылки
-    valid_platforms = ['instagram.com', 'tiktok.com', 'pinterest.com', 'pin.it', 'vt.tiktok.com']
+    # Проверка ссылок
+    valid_platforms = [
+        "instagram.com",
+        "tiktok.com",
+        "pinterest.com",
+        "pin.it",
+        "vt.tiktok.com",
+    ]
     if not any(p in text.lower() for p in valid_platforms):
-        bot.reply_to(message, "⚠️ Отправьте корректную ссылку на **Instagram**, **TikTok** или **Pinterest**.")
+        bot.reply_to(
+            message,
+            "⚠️ Отправь корректную ссылку на **Instagram**, **TikTok** или **Pinterest**.",
+        )
         return
 
     status_msg = bot.reply_to(message, "⏳ *Загрузка...*", parse_mode="Markdown")
 
     ydl_opts = {
-        'outtmpl': 'downloads/%(id)s.%(ext)s',
-        'quiet': True,
-        'no_warnings': True,
+        "outtmpl": "downloads/%(id)s.%(ext)s",
+        "quiet": True,
+        "no_warnings": True,
     }
 
     try:
@@ -241,16 +292,16 @@ def handle_all_messages(message):
             info = ydl.extract_info(text, download=True)
             filename = ydl.prepare_filename(info)
 
-        # Проверка VIP статуса для рекламы
         vip = is_vip(user_id)
-        caption_text = "✅ **Скачано через @SaveMediaBot**" if vip else "✅ **Скачано через @SaveMediaBot**\n\n📢 _Получи VIP без рекламы кнопкой «👑 VIP и Промокоды»!_"
+        caption_text = (
+            "✅ **Скачано через @SaveMediaBot**"
+            if vip
+            else "✅ **Скачано через @SaveMediaBot**\n\n📢 _Отключи рекламу в меню «👑 VIP и Промокоды»!_"
+        )
 
-        with open(filename, 'rb') as file:
+        with open(filename, "rb") as file:
             bot.send_document(
-                user_id,
-                file,
-                caption=caption_text,
-                parse_mode="Markdown"
+                user_id, file, caption=caption_text, parse_mode="Markdown"
             )
 
         if os.path.exists(filename):
@@ -259,7 +310,12 @@ def handle_all_messages(message):
         bot.delete_message(user_id, status_msg.message_id)
 
     except Exception as e:
-        bot.edit_message_text("❌ Ошибка загрузки. Проверьте ссылку.", chat_id=user_id, message_id=status_msg.message_id)
+        bot.edit_message_text(
+            "❌ Ошибка скачивания. Проверь доступность ссылки.",
+            chat_id=user_id,
+            message_id=status_msg.message_id,
+        )
+
 
 if __name__ == "__main__":
     threading.Thread(target=run_flask).start()
