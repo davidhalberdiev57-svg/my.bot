@@ -431,19 +431,14 @@ def handle_all_messages(message):
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
 
-    # Стабильные настройки с обходом блокировок
+    # Базовые стандартные настройки yt-dlp
     ydl_opts = {
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "format": "best",
         "outtmpl": "downloads/%(id)s.%(ext)s",
         "quiet": True,
         "no_warnings": True,
-        "noplaylist": True,
-        "nocheckcertificate": True,
-        "ignoreerrors": False,
-        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
 
-    filename = None
     try:
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(text, download=True)
@@ -478,22 +473,18 @@ def handle_all_messages(message):
                 except Exception:
                     pass
 
+        if os.path.exists(filename):
+            os.remove(filename)
+
         bot.delete_message(user_id, status_msg.message_id)
 
     except Exception as e:
         err_text = str(e)[:150]
         bot.edit_message_text(
-            f"❌ Ошибка скачивания (возможно, недопустимый формат или ссылка защищена):\n`{err_text}`",
+            f"❌ Ошибка скачивания:\n{err_text}",
             chat_id=user_id,
             message_id=status_msg.message_id,
-            parse_mode="Markdown",
         )
-    finally:
-        if filename and os.path.exists(filename):
-            try:
-                os.remove(filename)
-            except Exception:
-                pass
 
 
 if __name__ == "__main__":
