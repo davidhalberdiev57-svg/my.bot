@@ -28,19 +28,17 @@ BOT_USERNAME = "@saverui_bot"
 ADMIN_USERNAME = "@MediaFetch"
 ADMIN_PASSWORD = "571634sav"
 
-# Данные администраторов
+# Базы данных в памяти
 admins = set()
-
-# Хранилище данных
 all_users = set()
-vip_until = {}  # user_id: datetime окончания VIP
-referrals = {}  # user_id: set(приглашенных_user_id)
-user_states = {}  # user_id: текущее состояние ввода
+vip_until = {}
+referrals = {}
+user_states = {}
 
 # Промокоды по умолчанию
 promocodes = {"abdufattoh": "Вечный VIP"}
 
-# Рекламный модуль (ПО УМОЛЧАНИЮ ПУСТО)
+# Рекламный модуль (по умолчанию отключен)
 custom_ad_text = ""
 custom_ad_file_id = None
 custom_ad_file_type = None
@@ -60,7 +58,7 @@ def add_vip_days(user_id, days):
         vip_until[user_id] = now + datetime.timedelta(days=days)
 
 
-# Главное меню
+# Главная клавиатура
 def main_keyboard(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn1 = types.KeyboardButton("📥 Как скачивать")
@@ -79,7 +77,7 @@ def main_keyboard(user_id):
     return markup
 
 
-# Старт
+# Команда /start
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
     user_id = message.chat.id
@@ -115,7 +113,7 @@ def send_welcome(message):
     )
 
 
-# Админка
+# Вход в админку
 @bot.message_handler(commands=["admin"])
 def admin_login(message):
     args = message.text.split(maxsplit=1)
@@ -192,7 +190,7 @@ def del_ad(message):
     bot.reply_to(message, "✅ Реклама полностью удалена.")
 
 
-# Рассылки
+# Рассылка
 @bot.message_handler(commands=["broadcast"])
 def broadcast_msg(message):
     if message.chat.id not in admins:
@@ -213,7 +211,7 @@ def broadcast_msg(message):
     bot.reply_to(message, f"📢 Рассылка завершена! Отправлено {count} пользователям.")
 
 
-# Создание промокодов
+# Добавление промокодов
 @bot.message_handler(commands=["addpromo"])
 def add_promo(message):
     if message.chat.id not in admins:
@@ -232,7 +230,7 @@ def add_promo(message):
     bot.reply_to(message, f"✅ Промокод {code} на {days} дней успешно создан!")
 
 
-# Обработка покупки VIP через Telegram Stars
+# Оплата VIP за Telegram Stars
 @bot.callback_query_handler(func=lambda call: call.data.startswith("buy_vip_"))
 def handle_vip_buy(call):
     plan = call.data.split("_")[2]
@@ -261,7 +259,7 @@ def handle_vip_buy(call):
         title=title,
         description=description,
         invoice_payload=payload,
-        provider_token="",  # Для Telegram Stars используется пустой токен
+        provider_token="",
         currency="XTR",
         prices=prices,
         start_parameter="buy_vip",
@@ -297,7 +295,7 @@ def process_successful_payment(message):
     )
 
 
-# Кнопки меню
+# Обработка меню
 @bot.message_handler(
     func=lambda m: m.text
     in [
@@ -405,22 +403,19 @@ def handle_menu(message):
         bot.send_message(user_id, text)
 
 
-# Скачивание медиа и обработка промокодов
+# Скачивание медиа по ссылкам
 @bot.message_handler(func=lambda message: True)
 def handle_all_messages(message):
     user_id = message.chat.id
     text = message.text.strip() if message.text else ""
 
-    # Ввод промокода
     if user_states.get(user_id) == "WAITING_PROMO":
         user_states.pop(user_id, None)
-
         if text in promocodes or text == "abdufattoh":
             if text == "abdufattoh":
                 add_vip_days(user_id, 36500)
             else:
                 add_vip_days(user_id, 30)
-
             bot.reply_to(
                 message,
                 f"🎉 Промокод {text} активирован!\n👑 Вам зачислен VIP-доступ!",
@@ -429,7 +424,6 @@ def handle_all_messages(message):
             bot.reply_to(message, "❌ Неверный промокод.")
         return
 
-    # Проверка ссылок
     valid_platforms = [
         "instagram.com",
         "tiktok.com",
@@ -449,11 +443,21 @@ def handle_all_messages(message):
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
 
+    # Максимально быстрые настройки скачивания
     ydl_opts = {
+        "format": "b/best[ext=mp4]/best",
         "outtmpl": "downloads/%(id)s.%(ext)s",
         "quiet": True,
         "no_warnings": True,
+        "noplaylist": True,
+        "concurrent_fragment_downloads": 10,
+        "writeinfojson": False,
+        "skip_download_archive": True,
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+        "extractor_args": {
+            "youtube": ["player_skip=configs,js"],
+            "instagram": ["fast_dl=True"],
+        },
     }
 
     try:
@@ -462,9 +466,8 @@ def handle_all_messages(message):
             filename = ydl.prepare_filename(info)
 
         caption_text = f"✅ Скачано через {BOT_USERNAME}"
-
-        # 1. Отправляем медиафайл
         ext = os.path.splitext(filename)[1].lower()
+
         with open(filename, "rb") as file:
             if ext in [".mp4", ".mov", ".avi", ".webm"]:
                 bot.send_video(user_id, file, caption=caption_text)
@@ -473,7 +476,7 @@ def handle_all_messages(message):
             else:
                 bot.send_document(user_id, file, caption=caption_text)
 
-        # 2. Реклама отправляется ТОЛЬКО ЕСЛИ она явно задана админом
+        # Отправка рекламы ТОЛЬКО если она задана вручную
         vip = is_vip(user_id)
         if not vip:
             if custom_ad_file_id:
