@@ -1,10 +1,17 @@
 import os
 import threading
 import datetime
+import subprocess
 from flask import Flask
 import telebot
 from telebot import types
 from yt_dlp import YoutubeDL
+
+# Автоматическое обновление yt-dlp при запуске
+try:
+    subprocess.run(["pip", "install", "--upgrade", "yt-dlp"], check=True)
+except Exception as e:
+    print(f"Ошибка обновления yt-dlp: {e}")
 
 # 1. Веб-сервер 24/7 для Render
 app = Flask(__name__)
@@ -281,7 +288,7 @@ def handle_menu(message):
         )
         bot.send_message(user_id, text, parse_mode="Markdown")
 
-# Первоначальный оригинальный блок скачивания
+# Скачивание
 @bot.message_handler(func=lambda message: True)
 def handle_all_messages(message):
     user_id = message.chat.id
@@ -310,6 +317,7 @@ def handle_all_messages(message):
         'outtmpl': 'downloads/%(id)s.%(ext)s',
         'quiet': True,
         'no_warnings': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     }
 
     try:
