@@ -21,7 +21,7 @@ def run_flask():
 
 
 # 2. Настройки бота
-TOKEN = "8863043974:AAFhOR9dwlFrzw_zcvSRnMyk8CM7xDs02aM".strip()
+TOKEN = "8863043974:AAHYlaDv-Mwu074w_Ah4108rtg1eD-Ym2i4".strip()
 bot = telebot.TeleBot(TOKEN)
 
 BOT_USERNAME = "@saverui_bot"
