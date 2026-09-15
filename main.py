@@ -28,17 +28,14 @@ BOT_USERNAME = "@saverui_bot"
 ADMIN_USERNAME = "@MediaFetch"
 ADMIN_PASSWORD = "571634sav"
 
-# Базы данных в памяти
 admins = set()
 all_users = set()
 vip_until = {}
 referrals = {}
 user_states = {}
 
-# Промокоды по умолчанию
 promocodes = {"abdufattoh": "Вечный VIP"}
 
-# Рекламный модуль (по умолчанию отключен)
 custom_ad_text = ""
 custom_ad_file_id = None
 custom_ad_file_type = None
@@ -58,7 +55,6 @@ def add_vip_days(user_id, days):
         vip_until[user_id] = now + datetime.timedelta(days=days)
 
 
-# Главная клавиатура
 def main_keyboard(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn1 = types.KeyboardButton("📥 Как скачивать")
@@ -77,7 +73,6 @@ def main_keyboard(user_id):
     return markup
 
 
-# Команда /start
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
     user_id = message.chat.id
@@ -113,7 +108,6 @@ def send_welcome(message):
     )
 
 
-# Вход в админку
 @bot.message_handler(commands=["admin"])
 def admin_login(message):
     args = message.text.split(maxsplit=1)
@@ -129,7 +123,6 @@ def admin_login(message):
     )
 
 
-# Управление рекламой
 @bot.message_handler(commands=["setad"])
 def set_ad(message):
     global custom_ad_text, custom_ad_file_id, custom_ad_file_type
@@ -190,7 +183,6 @@ def del_ad(message):
     bot.reply_to(message, "✅ Реклама полностью удалена.")
 
 
-# Рассылка
 @bot.message_handler(commands=["broadcast"])
 def broadcast_msg(message):
     if message.chat.id not in admins:
@@ -211,7 +203,6 @@ def broadcast_msg(message):
     bot.reply_to(message, f"📢 Рассылка завершена! Отправлено {count} пользователям.")
 
 
-# Добавление промокодов
 @bot.message_handler(commands=["addpromo"])
 def add_promo(message):
     if message.chat.id not in admins:
@@ -230,7 +221,6 @@ def add_promo(message):
     bot.reply_to(message, f"✅ Промокод {code} на {days} дней успешно создан!")
 
 
-# Оплата VIP за Telegram Stars
 @bot.callback_query_handler(func=lambda call: call.data.startswith("buy_vip_"))
 def handle_vip_buy(call):
     plan = call.data.split("_")[2]
@@ -295,7 +285,6 @@ def process_successful_payment(message):
     )
 
 
-# Обработка меню
 @bot.message_handler(
     func=lambda m: m.text
     in [
@@ -403,7 +392,6 @@ def handle_menu(message):
         bot.send_message(user_id, text)
 
 
-# Скачивание медиа по ссылкам
 @bot.message_handler(func=lambda message: True)
 def handle_all_messages(message):
     user_id = message.chat.id
@@ -443,23 +431,19 @@ def handle_all_messages(message):
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
 
-    # Максимально быстрые настройки скачивания
+    # Стабильные настройки с обходом блокировок
     ydl_opts = {
-        "format": "b/best[ext=mp4]/best",
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "outtmpl": "downloads/%(id)s.%(ext)s",
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
-        "concurrent_fragment_downloads": 10,
-        "writeinfojson": False,
-        "skip_download_archive": True,
-        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-        "extractor_args": {
-            "youtube": ["player_skip=configs,js"],
-            "instagram": ["fast_dl=True"],
-        },
+        "nocheckcertificate": True,
+        "ignoreerrors": False,
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
 
+    filename = None
     try:
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(text, download=True)
@@ -476,7 +460,6 @@ def handle_all_messages(message):
             else:
                 bot.send_document(user_id, file, caption=caption_text)
 
-        # Отправка рекламы ТОЛЬКО если она задана вручную
         vip = is_vip(user_id)
         if not vip:
             if custom_ad_file_id:
@@ -495,18 +478,22 @@ def handle_all_messages(message):
                 except Exception:
                     pass
 
-        if os.path.exists(filename):
-            os.remove(filename)
-
         bot.delete_message(user_id, status_msg.message_id)
 
     except Exception as e:
         err_text = str(e)[:150]
         bot.edit_message_text(
-            f"❌ Ошибка скачивания:\n{err_text}",
+            f"❌ Ошибка скачивания (возможно, недопустимый формат или ссылка защищена):\n`{err_text}`",
             chat_id=user_id,
             message_id=status_msg.message_id,
+            parse_mode="Markdown",
         )
+    finally:
+        if filename and os.path.exists(filename):
+            try:
+                os.remove(filename)
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":
