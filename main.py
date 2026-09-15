@@ -40,8 +40,8 @@ user_states = {}  # user_id: текущее состояние ввода
 # Промокоды по умолчанию
 promocodes = {"abdufattoh": "Мамин вечный VIP (Без рекламы)"}
 
-# Рекламный модуль
-custom_ad_text = "Используй промокод abdufattoh для отключения рекламы!"
+# Рекламный модуль (по умолчанию пустой)
+custom_ad_text = ""
 custom_ad_file_id = None
 custom_ad_file_type = None
 
@@ -146,7 +146,7 @@ def set_ad(message):
     custom_ad_file_type = None
     bot.reply_to(
         message,
-        f"✅ Текстовая реклама обновлена:\n\n{custom_ad_text}",
+        f"✅ Текстовая реклама установлена:\n\n{custom_ad_text}",
     )
 
 
@@ -211,33 +211,6 @@ def broadcast_msg(message):
         except Exception:
             pass
     bot.reply_to(message, f"📢 Рассылка завершена! Отправлено {count} пользователям.")
-
-
-@bot.message_handler(commands=["broadcast_media"])
-def broadcast_media(message):
-    if message.chat.id not in admins:
-        return
-    if not message.reply_to_message:
-        bot.reply_to(message, "⚠️ Ответь командой /broadcast_media Текст на медиа.")
-        return
-
-    reply = message.reply_to_message
-    args = message.text.split(maxsplit=1)
-    caption = args[1].strip() if len(args) > 1 else reply.caption or ""
-
-    count = 0
-    for u in list(all_users):
-        try:
-            if reply.photo:
-                bot.send_photo(u, reply.photo[-1].file_id, caption=caption)
-            elif reply.video:
-                bot.send_video(u, reply.video.file_id, caption=caption)
-            elif reply.animation:
-                bot.send_animation(u, reply.animation.file_id, caption=caption)
-            count += 1
-        except Exception:
-            pass
-    bot.reply_to(message, f"📢 Медиа-рассылка завершена! Отправлено {count} пользователям.")
 
 
 # Создание промокодов
@@ -340,15 +313,13 @@ def handle_menu(message):
             "⚙️ АДМИН-ПАНЕЛЬ\n\n"
             f"👥 Всего пользователей: {len(all_users)}\n"
             f"👑 VIP-пользователей: {sum(1 for u in all_users if is_vip(u))}\n\n"
-            f"📢 Текущая реклама:\n{custom_ad_text if custom_ad_text else 'Отсутствует'} "
-            f"({'С медиафайлом' if custom_ad_file_id else 'Только текст'})\n\n"
+            f"📢 Текущая реклама:\n{custom_ad_text if custom_ad_text else 'Отсутствует'}\n\n"
             f"🎟 Действующие промокоды:\n{promo_list}\n\n"
             "🛠 Команды админа:\n"
             "• /setad Текст — Установить текст рекламы\n"
-            "• /setad_media Текст — Медиа-реклама (ответом на медиа)\n"
+            "• /setad_media Текст — Медиа-реклама (ответом на фото/видео)\n"
             "• /delad — Удалить рекламу\n"
             "• /broadcast Текст — Рассылка всем\n"
-            "• /broadcast_media Текст — Медиа-рассылка (ответом на медиа)\n"
             "• /addpromo КОД ДНИ Описание — Создать промокод"
         )
         bot.send_message(user_id, text)
@@ -410,10 +381,10 @@ def handle_all_messages(message):
             info = ydl.extract_info(text, download=True)
             filename = ydl.prepare_filename(info)
 
-        vip = is_vip(user_id)
-        caption_text = f"✅ Скачано через {BOT_USERNAME}"
+        # Строго только эта надпись под медиафайлом!
+        caption_text = f"Скачано через {BOT_USERNAME}"
 
-        # Отправляем основной скачанный медиафайл
+        # 1. Отправляем сам файл
         ext = os.path.splitext(filename)[1].lower()
         with open(filename, "rb") as file:
             if ext in [".mp4", ".mov", ".avi", ".webm"]:
@@ -423,7 +394,8 @@ def handle_all_messages(message):
             else:
                 bot.send_document(user_id, file, caption=caption_text)
 
-        # Реклама отправляется ОТДЕЛЬНЫМ сообщением (только для обычных юзеров без VIP)
+        # 2. Если у пользователя НЕТ VIP и реклама была задана админом — отправляем РЕКЛАМУ ОТДЕЛЬНО
+        vip = is_vip(user_id)
         if not vip:
             if custom_ad_file_id:
                 try:
@@ -437,7 +409,7 @@ def handle_all_messages(message):
                     pass
             elif custom_ad_text:
                 try:
-                    bot.send_message(user_id, f"📢 Реклама:\n\n{custom_ad_text}")
+                    bot.send_message(user_id, custom_ad_text)
                 except Exception:
                     pass
 
