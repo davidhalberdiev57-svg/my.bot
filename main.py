@@ -214,6 +214,18 @@ def broadcast_msg(message):
             pass
     bot.reply_to(message, f"📢 Рассылка завершена! Отправлено {count} пользователям.")
 
+@bot.message_handler(commands=['addpromo'])
+def add_promo(message):
+    if message.chat.id not in admins:
+        return
+    args = message.text.split(maxsplit=3)
+    if len(args) < 4 or not args[2].isdigit():
+        bot.reply_to(message, "⚠️ Используй: `/addpromo КОД ДНИ Описание`", parse_mode="Markdown")
+        return
+    code, days, desc = args[1].strip(), int(args[2]), args[3].strip()
+    promocodes[code] = f"+{days} дней VIP ({desc})"
+    bot.reply_to(message, f"✅ Промокод `{code}` создан!", parse_mode="Markdown")
+
 # Обработка меню
 @bot.message_handler(func=lambda m: m.text in ["📥 Как скачивать", "👑 VIP и Промокоды", "👥 Рефералы", "🎟 Ввести промокод", "📢 Заказать рекламу", "⚙️ Админ-панель"])
 def handle_menu(message):
@@ -269,7 +281,7 @@ def handle_menu(message):
         )
         bot.send_message(user_id, text, parse_mode="Markdown")
 
-# Скачивание и обработка ссылок
+# Первоначальный оригинальный блок скачивания
 @bot.message_handler(func=lambda message: True)
 def handle_all_messages(message):
     user_id = message.chat.id
@@ -286,22 +298,18 @@ def handle_all_messages(message):
             bot.reply_to(message, "❌ Неверный промокод.", parse_mode="Markdown")
         return
 
-    # Проверка ссылок
+    # Скачивание
     valid_platforms = ['instagram.com', 'tiktok.com', 'pinterest.com', 'pin.it', 'vt.tiktok.com']
     if not any(p in text.lower() for p in valid_platforms):
-        bot.reply_to(message, "⚠️ Отправь ссылку на **Instagram**, **TikTok** или **Pinterest**.")
+        bot.reply_to(message, f"⚠️ Отправь ссылку на **Instagram**, **TikTok** или **Pinterest**.")
         return
 
     status_msg = bot.reply_to(message, "⏳ *Загрузка...*", parse_mode="Markdown")
-
-    if not os.path.exists('downloads'):
-        os.makedirs('downloads')
 
     ydl_opts = {
         'outtmpl': 'downloads/%(id)s.%(ext)s',
         'quiet': True,
         'no_warnings': True,
-        'format': 'best',
     }
 
     try:
@@ -311,22 +319,17 @@ def handle_all_messages(message):
 
         vip = is_vip(user_id)
         
-        # Формирование подписи
+        # Подпись к медиа
         if vip:
             caption_text = f"✅ **Скачано через {BOT_USERNAME}**"
         else:
             ad_part = f"\n\n📢 _{custom_ad_text}_" if custom_ad_text else ""
             caption_text = f"✅ **Скачано через {BOT_USERNAME}**{ad_part}"
 
-        # Отправка скачанного файла (картинка или видео)
-        ext = os.path.splitext(filename)[1].lower()
         with open(filename, 'rb') as file:
-            if ext in ['.jpg', '.jpeg', '.png', '.webp']:
-                bot.send_photo(user_id, file, caption=caption_text, parse_mode="Markdown")
-            else:
-                bot.send_video(user_id, file, caption=caption_text, parse_mode="Markdown")
+            bot.send_document(user_id, file, caption=caption_text, parse_mode="Markdown")
 
-        # Отправка рекламного медиафайла (для НЕ-VIP пользователей)
+        # Если есть рекламное видео/картинка и пользователь НЕ VIP
         if not vip and custom_ad_file_id:
             try:
                 if custom_ad_file_type == "photo":
@@ -344,7 +347,7 @@ def handle_all_messages(message):
         bot.delete_message(user_id, status_msg.message_id)
 
     except Exception as e:
-        bot.edit_message_text("❌ Ошибка скачивания. Проверь доступность ссылки или попробуй позже.", chat_id=user_id, message_id=status_msg.message_id)
+        bot.edit_message_text("❌ Ошибка скачивания. Проверь доступность ссылки.", chat_id=user_id, message_id=status_msg.message_id)
 
 if __name__ == "__main__":
     threading.Thread(target=run_flask).start()
