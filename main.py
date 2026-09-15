@@ -38,9 +38,9 @@ referrals = {}  # user_id: set(приглашенных_user_id)
 user_states = {}  # user_id: текущее состояние ввода
 
 # Промокоды по умолчанию
-promocodes = {"abdufattoh": "Мамин вечный VIP (Без рекламы)"}
+promocodes = {"abdufattoh": "Вечный VIP"}
 
-# Рекламный модуль (по умолчанию пустой)
+# Рекламный модуль (ПО УМОЛЧАНИЮ ПУСТО)
 custom_ad_text = ""
 custom_ad_file_id = None
 custom_ad_file_type = None
@@ -189,7 +189,7 @@ def del_ad(message):
     custom_ad_text = ""
     custom_ad_file_id = None
     custom_ad_file_type = None
-    bot.reply_to(message, "✅ Реклама удалена.")
+    bot.reply_to(message, "✅ Реклама полностью удалена.")
 
 
 # Рассылки
@@ -232,6 +232,71 @@ def add_promo(message):
     bot.reply_to(message, f"✅ Промокод {code} на {days} дней успешно создан!")
 
 
+# Обработка покупки VIP через Telegram Stars
+@bot.callback_query_handler(func=lambda call: call.data.startswith("buy_vip_"))
+def handle_vip_buy(call):
+    plan = call.data.split("_")[2]
+
+    if plan == "1m":
+        title = "VIP Доступ — 1 Месяц"
+        description = "Подписка VIP на 30 дней в боте Saver UI"
+        payload = "vip_1m"
+        price = 10
+    elif plan == "1y":
+        title = "VIP Доступ — 1 Год"
+        description = "Подписка VIP на 365 дней в боте Saver UI"
+        payload = "vip_1y"
+        price = 100
+    elif plan == "forever":
+        title = "VIP Доступ — Навсегда"
+        description = "Бессрочный VIP доступ в боте Saver UI"
+        payload = "vip_forever"
+        price = 250
+    else:
+        return
+
+    prices = [types.LabeledPrice(label=title, amount=price)]
+    bot.send_invoice(
+        call.message.chat.id,
+        title=title,
+        description=description,
+        invoice_payload=payload,
+        provider_token="",  # Для Telegram Stars используется пустой токен
+        currency="XTR",
+        prices=prices,
+        start_parameter="buy_vip",
+    )
+    bot.answer_callback_query(call.id)
+
+
+@bot.pre_checkout_query_handler(func=lambda query: True)
+def process_pre_checkout_query(pre_checkout_query):
+    bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+
+
+@bot.successful_payment_handler(func=lambda message: True)
+def process_successful_payment(message):
+    user_id = message.chat.id
+    payload = message.successful_payment.invoice_payload
+
+    if payload == "vip_1m":
+        add_vip_days(user_id, 30)
+        days_str = "30 дней"
+    elif payload == "vip_1y":
+        add_vip_days(user_id, 365)
+        days_str = "1 год"
+    elif payload == "vip_forever":
+        add_vip_days(user_id, 36500)
+        days_str = "навсегда"
+    else:
+        days_str = "выбранный период"
+
+    bot.send_message(
+        user_id,
+        f"🎉 Спасибо за покупку!\n👑 Вам успешно зачислен VIP-статус ({days_str}).",
+    )
+
+
 # Кнопки меню
 @bot.message_handler(
     func=lambda m: m.text
@@ -267,15 +332,30 @@ def handle_menu(message):
 
         text = (
             f"👑 Ваш VIP-Статус: {status}\n\n"
-            "Возможности VIP:\n"
-            "• Без рекламы ✨\n"
+            "Преимущества VIP:\n"
+            "• Полное отсутствие рекламы ✨\n"
             "• Максимальная скорость скачивания 🚀\n"
             "• Безлимитная загрузка ⚡️\n\n"
-            "🎁 Как получить VIP бесплатно?\n"
-            "• Приглашай друзей по своей ссылке (+3 дня за человека)\n"
-            "• Активируй промокод кнопкой «🎟 Ввести промокод»"
+            "🛒 Купить VIP за Telegram Stars (⭐️):\n"
+            "• 1 месяц — 10 ⭐️\n"
+            "• 1 год — 100 ⭐️\n"
+            "• Навсегда — 250 ⭐️"
         )
-        bot.send_message(user_id, text)
+
+        markup = types.InlineKeyboardMarkup()
+        markup.add(
+            types.InlineKeyboardButton("⭐ 1 месяц (10 ⭐️)", callback_data="buy_vip_1m")
+        )
+        markup.add(
+            types.InlineKeyboardButton("⭐ 1 год (100 ⭐️)", callback_data="buy_vip_1y")
+        )
+        markup.add(
+            types.InlineKeyboardButton(
+                "⭐ Навсегда (250 ⭐️)", callback_data="buy_vip_forever"
+            )
+        )
+
+        bot.send_message(user_id, text, reply_markup=markup)
 
     elif message.text == "👥 Рефералы":
         ref_count = len(referrals.get(user_id, []))
@@ -329,7 +409,7 @@ def handle_menu(message):
 @bot.message_handler(func=lambda message: True)
 def handle_all_messages(message):
     user_id = message.chat.id
-    text = message.text.strip()
+    text = message.text.strip() if message.text else ""
 
     # Ввод промокода
     if user_states.get(user_id) == "WAITING_PROMO":
@@ -381,10 +461,9 @@ def handle_all_messages(message):
             info = ydl.extract_info(text, download=True)
             filename = ydl.prepare_filename(info)
 
-        # Строго только эта надпись под медиафайлом!
-        caption_text = f"Скачано через {BOT_USERNAME}"
+        caption_text = f"✅ Скачано через {BOT_USERNAME}"
 
-        # 1. Отправляем сам файл
+        # 1. Отправляем медиафайл
         ext = os.path.splitext(filename)[1].lower()
         with open(filename, "rb") as file:
             if ext in [".mp4", ".mov", ".avi", ".webm"]:
@@ -394,7 +473,7 @@ def handle_all_messages(message):
             else:
                 bot.send_document(user_id, file, caption=caption_text)
 
-        # 2. Если у пользователя НЕТ VIP и реклама была задана админом — отправляем РЕКЛАМУ ОТДЕЛЬНО
+        # 2. Реклама отправляется ТОЛЬКО ЕСЛИ она явно задана админом
         vip = is_vip(user_id)
         if not vip:
             if custom_ad_file_id:
