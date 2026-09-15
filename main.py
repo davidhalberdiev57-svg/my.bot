@@ -41,7 +41,7 @@ user_states = {}  # user_id: текущее состояние ввода
 promocodes = {"abdufattoh": "Мамин вечный VIP (Без рекламы)"}
 
 # Рекламный модуль
-custom_ad_text = "Используй промокод `abdufattoh` для отключения рекламы!"
+custom_ad_text = "Используй промокод abdufattoh для отключения рекламы!"
 custom_ad_file_id = None
 custom_ad_file_type = None
 
@@ -95,8 +95,7 @@ def send_welcome(message):
             try:
                 bot.send_message(
                     referrer_id,
-                    "🎉 По вашей ссылке зарегистрировался новый пользователь!\n🎁 Вам зачислено **+3 дня VIP**!",
-                    parse_mode="Markdown",
+                    "🎉 По вашей ссылке зарегистрировался новый пользователь!\n🎁 Вам зачислено +3 дня VIP!",
                 )
             except Exception:
                 pass
@@ -105,14 +104,13 @@ def send_welcome(message):
     user_states.pop(user_id, None)
 
     welcome_text = (
-        f"👋 Привет, **{message.from_user.first_name}**!\n\n"
-        f"Я скачиваю медиа из **Instagram**, **TikTok** и **Pinterest**.\n\n"
-        f"🔗 **Просто отправь мне ссылку на фото или видео!**"
+        f"👋 Привет, {message.from_user.first_name}!\n\n"
+        f"Я скачиваю медиа из Instagram, TikTok и Pinterest.\n\n"
+        f"🔗 Просто отправь мне ссылку на фото или видео!"
     )
     bot.send_message(
         user_id,
         welcome_text,
-        parse_mode="Markdown",
         reply_markup=main_keyboard(user_id),
     )
 
@@ -128,8 +126,7 @@ def admin_login(message):
     admins.add(message.chat.id)
     bot.reply_to(
         message,
-        "⚙️ **Успешный вход в Админ-панель!**",
-        parse_mode="Markdown",
+        "⚙️ Успешный вход в Админ-панель!",
         reply_markup=main_keyboard(message.chat.id),
     )
 
@@ -142,19 +139,14 @@ def set_ad(message):
         return
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
-        bot.reply_to(
-            message,
-            "⚠️ Напиши: `/setad Текст твоей рекламы`",
-            parse_mode="Markdown",
-        )
+        bot.reply_to(message, "⚠️ Напиши: /setad Текст твоей рекламы")
         return
     custom_ad_text = args[1].strip()
     custom_ad_file_id = None
     custom_ad_file_type = None
     bot.reply_to(
         message,
-        f"✅ **Текстовая реклама обновлена:**\n\n{custom_ad_text}",
-        parse_mode="Markdown",
+        f"✅ Текстовая реклама обновлена:\n\n{custom_ad_text}",
     )
 
 
@@ -165,9 +157,7 @@ def set_ad_media(message):
         return
 
     if not message.reply_to_message:
-        bot.reply_to(
-            message, "⚠️ Ответь командой `/setad_media Текст` на фото/видео."
-        )
+        bot.reply_to(message, "⚠️ Ответь командой /setad_media Текст на фото/видео.")
         return
 
     reply = message.reply_to_message
@@ -188,9 +178,7 @@ def set_ad_media(message):
         return
 
     custom_ad_text = text
-    bot.reply_to(
-        message, "✅ **Медиа-реклама установлена!**", parse_mode="Markdown"
-    )
+    bot.reply_to(message, "✅ Медиа-реклама установлена!")
 
 
 @bot.message_handler(commands=["delad"])
@@ -211,22 +199,18 @@ def broadcast_msg(message):
         return
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
-        bot.reply_to(
-            message, "⚠️ Напиши: `/broadcast Текст рассылки`", parse_mode="Markdown"
-        )
+        bot.reply_to(message, "⚠️ Напиши: /broadcast Текст рассылки")
         return
 
     msg_text = args[1].strip()
     count = 0
     for u in list(all_users):
         try:
-            bot.send_message(u, msg_text, parse_mode="Markdown")
+            bot.send_message(u, msg_text)
             count += 1
         except Exception:
             pass
-    bot.reply_to(
-        message, f"📢 Рассылка завершена! Отправлено {count} пользователям."
-    )
+    bot.reply_to(message, f"📢 Рассылка завершена! Отправлено {count} пользователям.")
 
 
 @bot.message_handler(commands=["broadcast_media"])
@@ -234,9 +218,7 @@ def broadcast_media(message):
     if message.chat.id not in admins:
         return
     if not message.reply_to_message:
-        bot.reply_to(
-            message, "⚠️ Ответь командой `/broadcast_media Текст` на медиа."
-        )
+        bot.reply_to(message, "⚠️ Ответь командой /broadcast_media Текст на медиа.")
         return
 
     reply = message.reply_to_message
@@ -247,26 +229,15 @@ def broadcast_media(message):
     for u in list(all_users):
         try:
             if reply.photo:
-                bot.send_photo(
-                    u,
-                    reply.photo[-1].file_id,
-                    caption=caption,
-                    parse_mode="Markdown",
-                )
+                bot.send_photo(u, reply.photo[-1].file_id, caption=caption)
             elif reply.video:
-                bot.send_video(
-                    u, reply.video.file_id, caption=caption, parse_mode="Markdown"
-                )
+                bot.send_video(u, reply.video.file_id, caption=caption)
             elif reply.animation:
-                bot.send_animation(
-                    u, reply.animation.file_id, caption=caption, parse_mode="Markdown"
-                )
+                bot.send_animation(u, reply.animation.file_id, caption=caption)
             count += 1
         except Exception:
             pass
-    bot.reply_to(
-        message, f"📢 Медиа-рассылка завершена! Отправлено {count} пользователям."
-    )
+    bot.reply_to(message, f"📢 Медиа-рассылка завершена! Отправлено {count} пользователям.")
 
 
 # Создание промокодов
@@ -277,11 +248,7 @@ def add_promo(message):
 
     args = message.text.split(maxsplit=3)
     if len(args) < 4 or not args[2].isdigit():
-        bot.reply_to(
-            message,
-            "⚠️ Использование: `/addpromo КОД ДНИ Описание`",
-            parse_mode="Markdown",
-        )
+        bot.reply_to(message, "⚠️ Использование: /addpromo КОД ДНИ Описание")
         return
 
     code = args[1].strip()
@@ -289,11 +256,7 @@ def add_promo(message):
     desc = args[3].strip()
 
     promocodes[code] = f"+{days} дней VIP ({desc})"
-    bot.reply_to(
-        message,
-        f"✅ Промокод `{code}` на **{days} дней** успешно создан!",
-        parse_mode="Markdown",
-    )
+    bot.reply_to(message, f"✅ Промокод {code} на {days} дней успешно создан!")
 
 
 # Кнопки меню
@@ -314,87 +277,81 @@ def handle_menu(message):
 
     if message.text == "📥 Как скачивать":
         text = (
-            "📌 **Инструкция:**\n\n"
-            "1. Скопируй ссылку из **Instagram**, **TikTok** или **Pinterest**.\n"
+            "📌 Инструкция:\n\n"
+            "1. Скопируй ссылку из Instagram, TikTok или Pinterest.\n"
             "2. Отправь её в этот чат.\n"
             "3. Получи файл в оригинальном качестве!"
         )
-        bot.send_message(user_id, text, parse_mode="Markdown")
+        bot.send_message(user_id, text)
 
     elif message.text == "👑 VIP и Промокоды":
         vip_active = is_vip(user_id)
         if vip_active:
             until_date = vip_until[user_id].strftime("%d.%m.%Y %H:%M")
-            status = f"✅ **АКТИВЕН (до {until_date})**"
+            status = f"✅ АКТИВЕН (до {until_date})"
         else:
-            status = "❌ **Не активен**"
+            status = "❌ Не активен"
 
         text = (
-            f"👑 **Ваш VIP-Статус:** {status}\n\n"
-            "**Возможности VIP:**\n"
+            f"👑 Ваш VIP-Статус: {status}\n\n"
+            "Возможности VIP:\n"
             "• Без рекламы ✨\n"
             "• Максимальная скорость скачивания 🚀\n"
             "• Безлимитная загрузка ⚡️\n\n"
-            "🎁 **Как получить VIP бесплатно?**\n"
+            "🎁 Как получить VIP бесплатно?\n"
             "• Приглашай друзей по своей ссылке (+3 дня за человека)\n"
             "• Активируй промокод кнопкой «🎟 Ввести промокод»"
         )
-        bot.send_message(user_id, text, parse_mode="Markdown")
+        bot.send_message(user_id, text)
 
     elif message.text == "👥 Рефералы":
         ref_count = len(referrals.get(user_id, []))
         ref_link = f"https://t.me/saverui_bot?start={user_id}"
 
         text = (
-            "👥 **Реферальная программа**\n\n"
-            f"Приглашено пользователей: **{ref_count}**\n"
-            "Награда: **+3 дня VIP** за каждого друга! 🎁\n\n"
-            "🔗 **Ваша уникальная ссылка:**\n"
-            f"`{ref_link}`"
+            "👥 Реферальная программа\n\n"
+            f"Приглашено пользователей: {ref_count}\n"
+            "Награда: +3 дня VIP за каждого друга! 🎁\n\n"
+            "🔗 Ваша уникальная ссылка:\n"
+            f"{ref_link}"
         )
-        bot.send_message(user_id, text, parse_mode="Markdown")
+        bot.send_message(user_id, text)
 
     elif message.text == "🎟 Ввести промокод":
         user_states[user_id] = "WAITING_PROMO"
-        bot.send_message(
-            user_id,
-            "✏️ **Отправь промокод ответным сообщением:**",
-            parse_mode="Markdown",
-        )
+        bot.send_message(user_id, "✏️ Отправь промокод ответным сообщением:")
 
     elif message.text == "📢 Заказать рекламу":
         text = (
-            "📢 **Размещение рекламы в боте**\n\n"
+            "📢 Размещение рекламы в боте\n\n"
             "Хотите привлечь новых клиентов или подписчиков?\n"
             "Ваш рекламный пост увидят все пользователи при скачивании медиа!\n\n"
-            f"📩 **По вопросам сотрудничества пишите админу:** {ADMIN_USERNAME}"
+            f"📩 По вопросам сотрудничества пишите админу: {ADMIN_USERNAME}"
         )
-        bot.send_message(user_id, text, parse_mode="Markdown")
+        bot.send_message(user_id, text)
 
     elif message.text == "⚙️ Админ-панель":
         if user_id not in admins:
             bot.send_message(user_id, "⛔️ Доступ запрещен.")
             return
 
-        promo_list = "\n".join(
-            [f"• `{code}` — {desc}" for code, desc in promocodes.items()]
-        )
+        promo_list = "\n".join([f"• {code} — {desc}" for code, desc in promocodes.items()])
         text = (
-            "⚙️ **АДМИН-ПАНЕЛЬ**\n\n"
-            f"👥 Всего пользователей: **{len(all_users)}**\n"
-            f"👑 VIP-пользователей: **{sum(1 for u in all_users if is_vip(u))}**\n\n"
-            f"📢 **Текущая реклама:**\n_{custom_ad_text if custom_ad_text else 'Отсутствует'}_ "
+            "⚙️ АДМИН-ПАНЕЛЬ\n\n"
+            f"👥 Всего пользователей: {len(all_users)}\n"
+            f"👑 VIP-пользователей: {sum(1 for u in all_users if is_vip(u))}\n\n"
+            f"📢 Текущая реклама:\n{custom_ad_text if custom_ad_text else 'Отсутствует'} "
             f"({'С медиафайлом' if custom_ad_file_id else 'Только текст'})\n\n"
-            f"🎟 **Действующие промокоды:**\n{promo_list}\n\n"
-            "🛠 **Команды админа:**\n"
-            "• `/setad Текст` — Установить текст рекламы\n"
-            "• `/setad_media Текст` — Медиа-реклама (ответом на медиа)\n"
-            "• `/delad` — Удалить рекламу\n"
-            "• `/broadcast Текст` — Рассылка всем\n"
-            "• `/broadcast_media Текст` — Медиа-рассылка (ответом на медиа)\n"
-            "• `/addpromo КОД ДНИ Описание` — Создать промокод"
+            f"🎟 Действующие промокоды:\n{promo_list}\n\n"
+            "🛠 Команды админа:\n"
+            "• /setad Текст — Установить текст рекламы\n"
+            "• /setad_media Текст — Медиа-реклама (ответом на медиа)\n"
+            "• /delad — Удалить рекламу\n"
+            "• /broadcast Текст — Рассылка всем\n"
+            "• /broadcast_media Текст — Медиа-рассылка (ответом на медиа)\n"
+            "• /addpromo КОД ДНИ Описание — Создать промокод"
         )
-        bot.send_message(user_id, text, parse_mode="Markdown")
+        bot.send_message(user_id, text)
 
 
 # Скачивание медиа и обработка промокодов
@@ -415,11 +372,10 @@ def handle_all_messages(message):
 
             bot.reply_to(
                 message,
-                f"🎉 **Промокод `{text}` активирован!**\n👑 Вам зачислен VIP-доступ!",
-                parse_mode="Markdown",
+                f"🎉 Промокод {text} активирован!\n👑 Вам зачислен VIP-доступ!",
             )
         else:
-            bot.reply_to(message, "❌ Неверный промокод.", parse_mode="Markdown")
+            bot.reply_to(message, "❌ Неверный промокод.")
         return
 
     # Проверка ссылок
@@ -433,11 +389,11 @@ def handle_all_messages(message):
     if not any(p in text.lower() for p in valid_platforms):
         bot.reply_to(
             message,
-            "⚠️ Отправь корректную ссылку на **Instagram**, **TikTok** или **Pinterest**.",
+            "⚠️ Отправь корректную ссылку на Instagram, TikTok или Pinterest.",
         )
         return
 
-    status_msg = bot.reply_to(message, "⏳ *Загрузка...*", parse_mode="Markdown")
+    status_msg = bot.reply_to(message, "⏳ Загрузка...")
 
     # Создаем папку если ее нет
     if not os.path.exists("downloads"):
@@ -457,25 +413,19 @@ def handle_all_messages(message):
 
         vip = is_vip(user_id)
         if vip:
-            caption_text = f"✅ **Скачано через {BOT_USERNAME}**"
+            caption_text = f"✅ Скачано через {BOT_USERNAME}"
         else:
-            ad_part = f"\n\n📢 _{custom_ad_text}_" if custom_ad_text else ""
-            caption_text = f"✅ **Скачано через {BOT_USERNAME}**{ad_part}"
+            ad_part = f"\n\n📢 {custom_ad_text}" if custom_ad_text else ""
+            caption_text = f"✅ Скачано через {BOT_USERNAME}{ad_part}"
 
         ext = os.path.splitext(filename)[1].lower()
         with open(filename, "rb") as file:
             if ext in [".mp4", ".mov", ".avi", ".webm"]:
-                bot.send_video(
-                    user_id, file, caption=caption_text, parse_mode="Markdown"
-                )
+                bot.send_video(user_id, file, caption=caption_text)
             elif ext in [".jpg", ".jpeg", ".png", ".webp"]:
-                bot.send_photo(
-                    user_id, file, caption=caption_text, parse_mode="Markdown"
-                )
+                bot.send_photo(user_id, file, caption=caption_text)
             else:
-                bot.send_document(
-                    user_id, file, caption=caption_text, parse_mode="Markdown"
-                )
+                bot.send_document(user_id, file, caption=caption_text)
 
         # Доп. медиа-реклама для обычных юзеров
         if not vip and custom_ad_file_id:
@@ -497,10 +447,9 @@ def handle_all_messages(message):
     except Exception as e:
         err_text = str(e)[:150]
         bot.edit_message_text(
-            f"❌ **Ошибка скачивания:**\n`{err_text}`",
+            f"❌ Ошибка скачивания:\n{err_text}",
             chat_id=user_id,
             message_id=status_msg.message_id,
-            parse_mode="Markdown",
         )
 
 
