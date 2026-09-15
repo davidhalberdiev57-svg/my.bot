@@ -21,7 +21,7 @@ def run_flask():
 
 
 # 2. Инициализация бота с новым токеном
-TOKEN = "8863043974:AAFhOR9dwlFrzw_zcvSRnMyk8CM7xDs02aM"
+TOKEN = "8863043974:AAFhOR9dwlFrzw_zcvSRnMyk8CM7xDs02aM".strip()
 bot = telebot.TeleBot(TOKEN)
 
 # Данные администраторов и безопасности
