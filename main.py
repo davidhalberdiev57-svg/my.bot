@@ -21,7 +21,7 @@ def run_flask():
 
 
 # Конфигурация
-TOKEN = "8559877177:AAEunCisHcxHZLYiN74i9zLA63L49GT-xQ0"
+TOKEN = "8559877177:AAFa_mkd80fOhAOW65M216UsBjWc5rZUHoE"
 bot = telebot.TeleBot(TOKEN)
 
 BOT_USERNAME = "@fozis_bot"
