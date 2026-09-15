@@ -20,22 +20,30 @@ def run_flask():
     app.run(host="0.0.0.0", port=port)
 
 
-# 2. Инициализация бота с новым токеном
-TOKEN = "8863043974:AAFhOR9dwlFrzw_zcvSRnMyk8CM7xDs02aM"
+# 2. Настройки бота
+TOKEN = "8863043974:AAFhOR9dwlFrzw_zcvSRnMyk8CM7xDs02aM".strip()
 bot = telebot.TeleBot(TOKEN)
 
-# Данные администраторов и безопасности
+BOT_USERNAME = "@saverui_bot"
+ADMIN_USERNAME = "@MediaFetch"
 ADMIN_PASSWORD = "571634sav"
+
+# Данные администраторов
 admins = set()
 
-# Данные пользователей и базы в памяти
+# Хранилище данных
 all_users = set()
 vip_until = {}  # user_id: datetime окончания VIP
 referrals = {}  # user_id: set(приглашенных_user_id)
 user_states = {}  # user_id: текущее состояние ввода
 
-# Базовые промокоды (Код: описание)
+# Промокоды по умолчанию
 promocodes = {"abdufattoh": "Мамин вечный VIP (Без рекламы)"}
+
+# Рекламный модуль
+custom_ad_text = "Используй промокод `abdufattoh` для отключения рекламы!"
+custom_ad_file_id = None
+custom_ad_file_type = None
 
 
 def is_vip(user_id):
@@ -52,15 +60,18 @@ def add_vip_days(user_id, days):
         vip_until[user_id] = now + datetime.timedelta(days=days)
 
 
-# Главная клавиатура с кнопками
+# Главное меню
 def main_keyboard(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn1 = types.KeyboardButton("📥 Как скачивать")
     btn2 = types.KeyboardButton("👑 VIP и Промокоды")
     btn3 = types.KeyboardButton("👥 Рефералы")
     btn4 = types.KeyboardButton("🎟 Ввести промокод")
+    btn5 = types.KeyboardButton("📢 Заказать рекламу")
+
     markup.add(btn1, btn2)
     markup.add(btn3, btn4)
+    markup.add(btn5)
 
     if user_id in admins:
         markup.add(types.KeyboardButton("⚙️ Админ-панель"))
@@ -68,21 +79,18 @@ def main_keyboard(user_id):
     return markup
 
 
-# Команда /start с поддержкой реферальных ссылок
+# Старт
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
     user_id = message.chat.id
     args = message.text.split()
 
-    # Проверка реферального перехода
     if len(args) > 1 and args[1].isdigit():
         referrer_id = int(args[1])
         if user_id not in all_users and referrer_id != user_id:
             if referrer_id not in referrals:
                 referrals[referrer_id] = set()
             referrals[referrer_id].add(user_id)
-
-            # Выдача +3 дня VIP пригласившему
             add_vip_days(referrer_id, 3)
             try:
                 bot.send_message(
@@ -109,7 +117,7 @@ def send_welcome(message):
     )
 
 
-# Вход в админку по паролю (/admin 571634sav)
+# Админка
 @bot.message_handler(commands=["admin"])
 def admin_login(message):
     args = message.text.split(maxsplit=1)
@@ -126,7 +134,142 @@ def admin_login(message):
     )
 
 
-# Добавление промокода админом: /addpromo КОД ДНИ Описание
+# Управление рекламой
+@bot.message_handler(commands=["setad"])
+def set_ad(message):
+    global custom_ad_text, custom_ad_file_id, custom_ad_file_type
+    if message.chat.id not in admins:
+        return
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        bot.reply_to(
+            message,
+            "⚠️ Напиши: `/setad Текст твоей рекламы`",
+            parse_mode="Markdown",
+        )
+        return
+    custom_ad_text = args[1].strip()
+    custom_ad_file_id = None
+    custom_ad_file_type = None
+    bot.reply_to(
+        message,
+        f"✅ **Текстовая реклама обновлена:**\n\n{custom_ad_text}",
+        parse_mode="Markdown",
+    )
+
+
+@bot.message_handler(commands=["setad_media"])
+def set_ad_media(message):
+    global custom_ad_text, custom_ad_file_id, custom_ad_file_type
+    if message.chat.id not in admins:
+        return
+
+    if not message.reply_to_message:
+        bot.reply_to(
+            message, "⚠️ Ответь командой `/setad_media Текст` на фото/видео."
+        )
+        return
+
+    reply = message.reply_to_message
+    args = message.text.split(maxsplit=1)
+    text = args[1].strip() if len(args) > 1 else ""
+
+    if reply.photo:
+        custom_ad_file_id = reply.photo[-1].file_id
+        custom_ad_file_type = "photo"
+    elif reply.video:
+        custom_ad_file_id = reply.video.file_id
+        custom_ad_file_type = "video"
+    elif reply.animation:
+        custom_ad_file_id = reply.animation.file_id
+        custom_ad_file_type = "animation"
+    else:
+        bot.reply_to(message, "⚠️ Ответь на фото, видео или гифку.")
+        return
+
+    custom_ad_text = text
+    bot.reply_to(
+        message, "✅ **Медиа-реклама установлена!**", parse_mode="Markdown"
+    )
+
+
+@bot.message_handler(commands=["delad"])
+def del_ad(message):
+    global custom_ad_text, custom_ad_file_id, custom_ad_file_type
+    if message.chat.id not in admins:
+        return
+    custom_ad_text = ""
+    custom_ad_file_id = None
+    custom_ad_file_type = None
+    bot.reply_to(message, "✅ Реклама удалена.")
+
+
+# Рассылки
+@bot.message_handler(commands=["broadcast"])
+def broadcast_msg(message):
+    if message.chat.id not in admins:
+        return
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        bot.reply_to(
+            message, "⚠️ Напиши: `/broadcast Текст рассылки`", parse_mode="Markdown"
+        )
+        return
+
+    msg_text = args[1].strip()
+    count = 0
+    for u in list(all_users):
+        try:
+            bot.send_message(u, msg_text, parse_mode="Markdown")
+            count += 1
+        except Exception:
+            pass
+    bot.reply_to(
+        message, f"📢 Рассылка завершена! Отправлено {count} пользователям."
+    )
+
+
+@bot.message_handler(commands=["broadcast_media"])
+def broadcast_media(message):
+    if message.chat.id not in admins:
+        return
+    if not message.reply_to_message:
+        bot.reply_to(
+            message, "⚠️ Ответь командой `/broadcast_media Текст` на медиа."
+        )
+        return
+
+    reply = message.reply_to_message
+    args = message.text.split(maxsplit=1)
+    caption = args[1].strip() if len(args) > 1 else reply.caption or ""
+
+    count = 0
+    for u in list(all_users):
+        try:
+            if reply.photo:
+                bot.send_photo(
+                    u,
+                    reply.photo[-1].file_id,
+                    caption=caption,
+                    parse_mode="Markdown",
+                )
+            elif reply.video:
+                bot.send_video(
+                    u, reply.video.file_id, caption=caption, parse_mode="Markdown"
+                )
+            elif reply.animation:
+                bot.send_animation(
+                    u, reply.animation.file_id, caption=caption, parse_mode="Markdown"
+                )
+            count += 1
+        except Exception:
+            pass
+    bot.reply_to(
+        message, f"📢 Медиа-рассылка завершена! Отправлено {count} пользователям."
+    )
+
+
+# Создание промокодов
 @bot.message_handler(commands=["addpromo"])
 def add_promo(message):
     if message.chat.id not in admins:
@@ -136,7 +279,7 @@ def add_promo(message):
     if len(args) < 4 or not args[2].isdigit():
         bot.reply_to(
             message,
-            "⚠️ **Неверный формат!**\n\nИспользуй: `/addpromo КОД ДНИ Описание`\nПример: `/addpromo dep 90 Промокод для депа`",
+            "⚠️ Использование: `/addpromo КОД ДНИ Описание`",
             parse_mode="Markdown",
         )
         return
@@ -153,7 +296,7 @@ def add_promo(message):
     )
 
 
-# Обработка меню
+# Кнопки меню
 @bot.message_handler(
     func=lambda m: m.text
     in [
@@ -161,6 +304,7 @@ def add_promo(message):
         "👑 VIP и Промокоды",
         "👥 Рефералы",
         "🎟 Ввести промокод",
+        "📢 Заказать рекламу",
         "⚙️ Админ-панель",
     ]
 )
@@ -199,8 +343,7 @@ def handle_menu(message):
 
     elif message.text == "👥 Рефералы":
         ref_count = len(referrals.get(user_id, []))
-        bot_username = bot.get_me().username
-        ref_link = f"https://t.me/{bot_username}?start={user_id}"
+        ref_link = f"https://t.me/saverui_bot?start={user_id}"
 
         text = (
             "👥 **Реферальная программа**\n\n"
@@ -219,6 +362,15 @@ def handle_menu(message):
             parse_mode="Markdown",
         )
 
+    elif message.text == "📢 Заказать рекламу":
+        text = (
+            "📢 **Размещение рекламы в боте**\n\n"
+            "Хотите привлечь новых клиентов или подписчиков?\n"
+            "Ваш рекламный пост увидят все пользователи при скачивании медиа!\n\n"
+            f"📩 **По вопросам сотрудничества пишите админу:** {ADMIN_USERNAME}"
+        )
+        bot.send_message(user_id, text, parse_mode="Markdown")
+
     elif message.text == "⚙️ Админ-панель":
         if user_id not in admins:
             bot.send_message(user_id, "⛔️ Доступ запрещен.")
@@ -231,27 +383,33 @@ def handle_menu(message):
             "⚙️ **АДМИН-ПАНЕЛЬ**\n\n"
             f"👥 Всего пользователей: **{len(all_users)}**\n"
             f"👑 VIP-пользователей: **{sum(1 for u in all_users if is_vip(u))}**\n\n"
+            f"📢 **Текущая реклама:**\n_{custom_ad_text if custom_ad_text else 'Отсутствует'}_ "
+            f"({'С медиафайлом' if custom_ad_file_id else 'Только текст'})\n\n"
             f"🎟 **Действующие промокоды:**\n{promo_list}\n\n"
-            "➕ **Создать промокод:**\n"
-            "Напиши: `/addpromo КОД ДНИ Описание`\n"
-            "_(Пример: `/addpromo dep 90 Промокод для депа`)_"
+            "🛠 **Команды админа:**\n"
+            "• `/setad Текст` — Установить текст рекламы\n"
+            "• `/setad_media Текст` — Медиа-реклама (ответом на медиа)\n"
+            "• `/delad` — Удалить рекламу\n"
+            "• `/broadcast Текст` — Рассылка всем\n"
+            "• `/broadcast_media Текст` — Медиа-рассылка (ответом на медиа)\n"
+            "• `/addpromo КОД ДНИ Описание` — Создать промокод"
         )
         bot.send_message(user_id, text, parse_mode="Markdown")
 
 
-# Скачивание медиа и обработка введенного промокода
+# Скачивание медиа и обработка промокодов
 @bot.message_handler(func=lambda message: True)
 def handle_all_messages(message):
     user_id = message.chat.id
     text = message.text.strip()
 
-    # Ввод промокода через кнопку
+    # Ввод промокода
     if user_states.get(user_id) == "WAITING_PROMO":
         user_states.pop(user_id, None)
 
         if text in promocodes or text == "abdufattoh":
             if text == "abdufattoh":
-                add_vip_days(user_id, 36500)  # Вечный VIP для мамы
+                add_vip_days(user_id, 36500)
             else:
                 add_vip_days(user_id, 30)
 
@@ -281,10 +439,15 @@ def handle_all_messages(message):
 
     status_msg = bot.reply_to(message, "⏳ *Загрузка...*", parse_mode="Markdown")
 
+    # Создаем папку если ее нет
+    if not os.path.exists("downloads"):
+        os.makedirs("downloads")
+
     ydl_opts = {
         "outtmpl": "downloads/%(id)s.%(ext)s",
         "quiet": True,
         "no_warnings": True,
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
     }
 
     try:
@@ -293,16 +456,38 @@ def handle_all_messages(message):
             filename = ydl.prepare_filename(info)
 
         vip = is_vip(user_id)
-        caption_text = (
-            "✅ **Скачано через @SaveMediaBot**"
-            if vip
-            else "✅ **Скачано через @SaveMediaBot**\n\n📢 _Отключи рекламу в меню «👑 VIP и Промокоды»!_"
-        )
+        if vip:
+            caption_text = f"✅ **Скачано через {BOT_USERNAME}**"
+        else:
+            ad_part = f"\n\n📢 _{custom_ad_text}_" if custom_ad_text else ""
+            caption_text = f"✅ **Скачано через {BOT_USERNAME}**{ad_part}"
 
+        ext = os.path.splitext(filename)[1].lower()
         with open(filename, "rb") as file:
-            bot.send_document(
-                user_id, file, caption=caption_text, parse_mode="Markdown"
-            )
+            if ext in [".mp4", ".mov", ".avi", ".webm"]:
+                bot.send_video(
+                    user_id, file, caption=caption_text, parse_mode="Markdown"
+                )
+            elif ext in [".jpg", ".jpeg", ".png", ".webp"]:
+                bot.send_photo(
+                    user_id, file, caption=caption_text, parse_mode="Markdown"
+                )
+            else:
+                bot.send_document(
+                    user_id, file, caption=caption_text, parse_mode="Markdown"
+                )
+
+        # Доп. медиа-реклама для обычных юзеров
+        if not vip and custom_ad_file_id:
+            try:
+                if custom_ad_file_type == "photo":
+                    bot.send_photo(user_id, custom_ad_file_id)
+                elif custom_ad_file_type == "video":
+                    bot.send_video(user_id, custom_ad_file_id)
+                elif custom_ad_file_type == "animation":
+                    bot.send_animation(user_id, custom_ad_file_id)
+            except Exception:
+                pass
 
         if os.path.exists(filename):
             os.remove(filename)
@@ -310,10 +495,12 @@ def handle_all_messages(message):
         bot.delete_message(user_id, status_msg.message_id)
 
     except Exception as e:
+        err_text = str(e)[:150]
         bot.edit_message_text(
-            "❌ Ошибка скачивания. Проверь доступность ссылки.",
+            f"❌ **Ошибка скачивания:**\n`{err_text}`",
             chat_id=user_id,
             message_id=status_msg.message_id,
+            parse_mode="Markdown",
         )
 
 
