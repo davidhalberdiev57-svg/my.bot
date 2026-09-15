@@ -395,7 +395,6 @@ def handle_all_messages(message):
 
     status_msg = bot.reply_to(message, "⏳ Загрузка...")
 
-    # Создаем папку если ее нет
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
 
@@ -412,12 +411,9 @@ def handle_all_messages(message):
             filename = ydl.prepare_filename(info)
 
         vip = is_vip(user_id)
-        if vip:
-            caption_text = f"✅ Скачано через {BOT_USERNAME}"
-        else:
-            ad_part = f"\n\n📢 {custom_ad_text}" if custom_ad_text else ""
-            caption_text = f"✅ Скачано через {BOT_USERNAME}{ad_part}"
+        caption_text = f"✅ Скачано через {BOT_USERNAME}"
 
+        # Отправляем основной скачанный медиафайл
         ext = os.path.splitext(filename)[1].lower()
         with open(filename, "rb") as file:
             if ext in [".mp4", ".mov", ".avi", ".webm"]:
@@ -427,17 +423,23 @@ def handle_all_messages(message):
             else:
                 bot.send_document(user_id, file, caption=caption_text)
 
-        # Доп. медиа-реклама для обычных юзеров
-        if not vip and custom_ad_file_id:
-            try:
-                if custom_ad_file_type == "photo":
-                    bot.send_photo(user_id, custom_ad_file_id)
-                elif custom_ad_file_type == "video":
-                    bot.send_video(user_id, custom_ad_file_id)
-                elif custom_ad_file_type == "animation":
-                    bot.send_animation(user_id, custom_ad_file_id)
-            except Exception:
-                pass
+        # Реклама отправляется ОТДЕЛЬНЫМ сообщением (только для обычных юзеров без VIP)
+        if not vip:
+            if custom_ad_file_id:
+                try:
+                    if custom_ad_file_type == "photo":
+                        bot.send_photo(user_id, custom_ad_file_id, caption=custom_ad_text)
+                    elif custom_ad_file_type == "video":
+                        bot.send_video(user_id, custom_ad_file_id, caption=custom_ad_text)
+                    elif custom_ad_file_type == "animation":
+                        bot.send_animation(user_id, custom_ad_file_id, caption=custom_ad_text)
+                except Exception:
+                    pass
+            elif custom_ad_text:
+                try:
+                    bot.send_message(user_id, f"📢 Реклама:\n\n{custom_ad_text}")
+                except Exception:
+                    pass
 
         if os.path.exists(filename):
             os.remove(filename)
